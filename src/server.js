@@ -1,63 +1,41 @@
-// src/server.js
-
 import express from 'express';
+import dotenv from 'dotenv';
 import cors from 'cors';
-import pino from 'pino-http';
-import 'dotenv/config';
+import helmet from 'helmet';
 
+dotenv.config();
 const app = express();
-
-// Використовуємо значення з .env або дефолтний порт 3000
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
-
-
-
 app.use(express.json());
 app.use(cors());
-app.use(
-  pino({
-    level: 'info',
-    transport: {
-      target: 'pino-pretty',
-      options: {
-        colorize: true,
-        translateTime: 'HH:MM:ss',
-        ignore: 'pid,hostname',
-        messageFormat: '{req.method} {req.url} {res.statusCode} - {responseTime}ms',
-        hideObject: true,
-      },
-    },
-  }),
-);
+app.use(helmet());
 
+const PORT = process.env.PORT || 3000;
 
-
-
-
-// Middleware для обробки помилок
-app.use((err, req, res, next) => {
-  console.error(err);
-
-  const isProd = process.env.NODE_ENV === "production";
-
-  res.status(500).json({
-    message: isProd
-      ? "Something went wrong. Please try again later."
-      : err.message,
-  });
+app.get('/', (req, res) => {
+  res.status(200).json({ message: 'My first route!' });
 });
 
+app.get('/notes', (req, res) => {
+  res.status(200).json({ message: 'Retrieved all notes' });
+});
 
- 
-// Middleware для парсингу JSON
+app.get('/notes/:noteId', (req, res) => {
+  res
+    .status(200)
+    .json({ message: `Retrieved note with ID: ${req.params.noteId}` });
+});
 
-app.post('/users', (req, res) => {
-  console.log(req.body); // тепер тіло доступне як JS-об’єкт
-  res.status(201).json({ message: 'User created' });
+app.get('/test-error', () => {
+  throw new Error('Simulated server error');
+});
+
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
+
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
 });
 
 app.listen(PORT, () => {
