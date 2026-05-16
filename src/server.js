@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
-
+import { errors } from 'celebrate';
 import { connectMongoDB } from './db/connectMongoDB.js';
 
 import notesRoutes from './routes/notesRoutes.js';
@@ -16,14 +16,19 @@ const PORT = Number(process.env.PORT) || 3000;
 
 app.use(logger);
 
-app.use(cors());
+app.use(
+  cors({
+    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+    origin: '*',
+  }),
+);
 
 app.use(express.json());
 
 app.use(notesRoutes);
 
 app.use(notFoundHandler);
-
+app.use(errors());
 app.use(errorHandler);
 
 await connectMongoDB();

@@ -14,7 +14,7 @@ export const getAllNotes = async (req, res) => {
   }
 
   if (search) {
-    notesQuery.find({
+    notesQuery.where({
       $text: { $search: search },
     });
   }
