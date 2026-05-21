@@ -3,12 +3,12 @@ import cors from 'cors';
 import 'dotenv/config';
 import { errors } from 'celebrate';
 import { connectMongoDB } from './db/connectMongoDB.js';
-
 import notesRoutes from './routes/notesRoutes.js';
-
+import cookieParser from 'cookie-parser';
 import { logger } from './middleware/logger.js';
 import { notFoundHandler } from './middleware/notFoundHandler.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import authRoutes from './routes/authRoutes.js';
 
 const app = express();
 
@@ -24,9 +24,10 @@ app.use(
 );
 
 app.use(express.json());
+app.use(cookieParser());
 
 app.use(notesRoutes);
-
+app.use(authRoutes);
 app.use(notFoundHandler);
 app.use(errors());
 app.use(errorHandler);
