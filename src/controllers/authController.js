@@ -58,7 +58,7 @@ export const logoutUser = async (req, res) => {
 };
 
 // post /auth/refresh 401 > logout
-export const refreshSession = async (req, res) => {
+export const refreshUserSession = async (req, res) => {
   const { sessionId, refreshToken } = req.cookies;
 
   if (!sessionId || !refreshToken) {
