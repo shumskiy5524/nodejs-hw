@@ -6,24 +6,30 @@ const userSchema = new Schema(
       type: String,
       trim: true,
     },
+
     email: {
       type: String,
       trim: true,
       unique: true,
       required: true,
     },
+
     password: {
       type: String,
       required: true,
     },
+
+    avatar: {
+      type: String,
+      required: false,
+      default: 'https://ac.goit.global/fullstack/react/default-avatar.jpg',
+    },
   },
   { timestamps: true },
 );
-
-userSchema.pre('save', function () {
-  if (!this.username) {
-    this.username = this.email;
-  }
+userSchema.pre('save', function (next) {
+  this.username = this.email;
+  next();
 });
 
 userSchema.methods.toJSON = function () {
