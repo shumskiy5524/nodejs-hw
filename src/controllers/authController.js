@@ -5,9 +5,26 @@ import { createSession, setSessionCookies } from '../services/auth.js';
 import { Session } from '../models/session.js';
 import jwt from 'jsonwebtoken';
 import { sendEmail } from '../utils/sendMail.js';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import handlebars from 'handlebars';
+
+const templatePath = path.join(
+  process.cwd(),
+  'src',
+  'templates',
+  'reset-password-email.html',
+);
+
+const resetPasswordTemplate = await fs.readFile(templatePath, 'utf8');
+
+const resetPasswordCompiled = handlebars.compile(resetPasswordTemplate);
 
 export const registerUser = async (req, res) => {
-  const existingUser = await User.findOne({ email: req.body.email });
+  const existingUser = await User.findOne({
+    email: req.body.email,
+  });
+
   if (existingUser) {
     throw createHttpError(400, 'Email in use');
   }
@@ -20,13 +37,17 @@ export const registerUser = async (req, res) => {
   });
 
   const session = await createSession(newUser._id);
+
   setSessionCookies(res, session);
 
   res.status(201).json(newUser);
 };
 
 export const loginUser = async (req, res) => {
-  const user = await User.findOne({ email: req.body.email });
+  const user = await User.findOne({
+    email: req.body.email,
+  });
+
   if (!user) {
     throw createHttpError(401, 'Invalid credentials');
   }
@@ -35,13 +56,17 @@ export const loginUser = async (req, res) => {
     req.body.password,
     user.password,
   );
+
   if (!isValidPassword) {
     throw createHttpError(401, 'Invalid credentials');
   }
 
-  await Session.deleteOne({ userId: user._id });
+  await Session.deleteOne({
+    userId: user._id,
+  });
 
   const session = await createSession(user._id);
+
   setSessionCookies(res, session);
 
   res.status(200).json(user);
@@ -49,7 +74,9 @@ export const loginUser = async (req, res) => {
 
 export const logoutUser = async (req, res) => {
   if (req.cookies.sessionId) {
-    await Session.deleteOne({ _id: req.cookies.sessionId });
+    await Session.deleteOne({
+      _id: req.cookies.sessionId,
+    });
   }
 
   res.clearCookie('accessToken');
@@ -75,19 +102,22 @@ export const refreshUserSession = async (req, res) => {
     throw createHttpError(401, 'Invalid session');
   }
 
-  const isRefreshTokenExpired = session.refreshTokenValidUntil < new Date();
-  if (isRefreshTokenExpired) {
+  const isExpired = session.refreshTokenValidUntil < new Date();
+
+  if (isExpired) {
     await session.deleteOne();
+
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
     res.clearCookie('sessionId');
+
     throw createHttpError(401, 'Invalid session');
   }
 
-  // якшо є кукі, є сесія і refresh валідний
   await session.deleteOne();
 
   const newSession = await createSession(session.userId);
+
   setSessionCookies(res, newSession);
 
   res.status(200).json({
@@ -96,38 +126,55 @@ export const refreshUserSession = async (req, res) => {
 };
 
 export const requestResetEmail = async (req, res) => {
-  const user = await User.findOne({ email: req.body.email });
+  const user = await User.findOne({
+    email: req.body.email,
+  });
+
   if (!user) {
-    return res.status(200).json({ message: 'Email sent, check inbox!' });
+    return res.status(200).json({
+      message: 'Password reset email sent successfully',
+    });
   }
 
   const resetToken = jwt.sign(
-    { email: user.email, sub: user._id },
+    {
+      email: user.email,
+      sub: user._id,
+    },
     process.env.JWT_SECRET,
-    { expiresIn: '15m' },
+    {
+      expiresIn: '15m',
+    },
   );
 
-  const frontEndUrl = `${process.env.FRONTEND_DOMAIN}?token=${resetToken}`;
+  const resetPasswordLink = `${process.env.FRONTEND_DOMAIN}/reset-password?token=${resetToken}`;
 
   try {
+    const html = resetPasswordCompiled({
+      name: user.name || user.email,
+      link: resetPasswordLink,
+    });
+
     await sendEmail({
       from: process.env.SMTP_FROM,
-      to: req.body.email,
+      to: user.email,
       subject: 'Password reset',
-      html: `<p>Click <a href="${frontEndUrl}">here</a> to reset your password!!!</p>`,
+      html,
     });
   } catch (error) {
-    console.log(error);
-    throw createHttpError(500, error);
+    console.error(error);
+
+    throw createHttpError(500, 'Failed to send email');
   }
 
-  res
-    .status(200)
-    .json({ message: 'Email sentPassword reset email sent successfully' });
+  res.status(200).json({
+    message: 'Password reset email sent successfully',
+  });
 };
 
 export const resetPassword = async (req, res) => {
   let payload;
+
   try {
     payload = jwt.verify(req.body.token, process.env.JWT_SECRET);
   } catch {
@@ -138,14 +185,25 @@ export const resetPassword = async (req, res) => {
     _id: payload.sub,
     email: payload.email,
   });
+
   if (!user) {
     throw createHttpError(404, 'User not found');
   }
 
   const hashedPassword = await bcrypt.hash(req.body.password, 10);
-  await User.updateOne({ _id: user._id }, { password: hashedPassword });
 
-  await Session.deleteMany({ userId: user._id });
+  await User.updateOne(
+    {
+      _id: user._id,
+    },
+    {
+      password: hashedPassword,
+    },
+  );
+
+  await Session.deleteMany({
+    userId: user._id,
+  });
 
   res.status(200).json({
     message: 'Password reset successfully',
